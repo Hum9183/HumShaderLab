@@ -1,11 +1,11 @@
-Shader "HumShaderLab/Phong(Preview)"
+Shader "HumShaderLab/Phong"
 {
     Properties
     {
         [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
         [MainColor]   _BaseColor("Base Color", Color) = (1,1,1,1)
-        _SpecularAperture("SpecularAperture", Range(5.0, 10.0)) = 5.0
-        _Ambient("Ambient", Range(0.0, 0.5)) = 0.2
+        _SpecularAperture("SpecularAperture", Range(5.0, 20.0)) = 16.0
+        _Ambient("Ambient", Range(0.0, 0.5)) = 0.1
     }
 
     SubShader
@@ -33,12 +33,10 @@ Shader "HumShaderLab/Phong(Preview)"
 
             struct Varyings
             {
-                // TODO: 未使用メンバの見直し
-                float4 positionHCS    : SV_POSITION;
-                float2 uv             : TEXCOORD0;
-                float3 positionWS     : TEXCOORD1;
-                float3 normalWS       : TEXCOORD2;
-                half3  viewDirWS      : TEXCOORD3;
+                float4 positionHCS  : SV_POSITION;
+                float2 uv           : TEXCOORD0;
+                float3 normalWS     : TEXCOORD1;
+                half3  viewDirWS    : TEXCOORD2;
             };
 
             TEXTURE2D(_BaseMap);
@@ -53,22 +51,17 @@ Shader "HumShaderLab/Phong(Preview)"
 
             Varyings vert(Attributes IN)
             {
-                // TODO: 未使用メンバの見直し
                 Varyings OUT;
-                OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz);
-                OUT.positionWS  = TransformObjectToWorld(IN.positionOS.xyz);
-                OUT.normalWS    = TransformObjectToWorldNormal(IN.normalOS);
-                OUT.viewDirWS   = GetWorldSpaceNormalizeViewDir(OUT.positionWS);
+                OUT.positionHCS   = TransformObjectToHClip(IN.positionOS.xyz);
+                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
+                OUT.normalWS      = TransformObjectToWorldNormal(IN.normalOS);
+                OUT.viewDirWS     = GetWorldSpaceNormalizeViewDir(positionWS);
                 OUT.uv = TRANSFORM_TEX(IN.texcoord, _BaseMap);
                 return OUT;
             }
 
             half4 frag(Varyings IN) : SV_Target
             {
-                // TODO:
-                // 型の見直し(halfへの移行)
-                // プロパティ出しする変数の選定
-
                 half3 baseMapColor = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, IN.uv).rgb;
                 half3 diffuse = baseMapColor * _BaseColor.rgb;
 
@@ -82,11 +75,11 @@ Shader "HumShaderLab/Phong(Preview)"
 
                 // Specular
                 float3 reflectionVector = reflect(-mainLightDirWS, IN.normalWS);
-                reflectionVector = normalize(reflectionVector);
-                float3 specular = dot(reflectionVector, IN.viewDirWS);
-                specular = saturate(specular);
-                specular = pow(specular, _SpecularAperture);
-                specular *= mainLightColor;
+                reflectionVector = SafeNormalize(reflectionVector);
+                float RdotV = dot(reflectionVector, IN.viewDirWS);
+                RdotV = saturate(RdotV);
+                RdotV = pow(RdotV, _SpecularAperture);
+                half3 specular = mainLightColor * RdotV;
 
                 // Ambient
                 half ambient = _Ambient;
